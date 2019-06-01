@@ -1,0 +1,50 @@
+getwd()
+setwd("")
+library(GEOquery) 
+gset <- getGEO('GSE120878', destdir=".", 
+               AnnotGPL = T,  
+               getGPL = T)  
+save(gset,file='GSE120878_eSet.Rdata') ## 保存到本地 
+load('GSE120878_eSet.Rdata') ## 载入数据 
+b = gset[[1]] ## 降级提取b 
+exprSet=exprs(b) ## 获取表达矩阵，发现已是log处理后的数据。通常表达矩阵的原始数字从0但好几百万都不等，需要进行归一化处理。14488875 elements 
+exprSet[1:5,1:5]
+pdata = pData(b) ## 使用函数?pData获取样本临床信息（如性别、年龄、肿瘤分期等等） 
+colnames(pdata) ## 查看列名，即查看所包含的临床信息类型， 
+length(colnames(pdata)) ## 查看pdata列数  
+pdata[,33] ## 查看第67列triple negative status的数据情况,发现按照"Tumor"，"not Tumor"排列 
+group_list = as.character(pdata[, 33]) ## 将67列改成字符 
+dim(exprSet) ## 查看矩阵的维度  
+table(group_list) ## 查看67列信息 
+ 
+Normal_expr = exprSet[, grep("Nevus", group_list)]# 提出"not Tumor"所有行数据 3663225 elementsas.matrix( 
+Tumor_expr = exprSet[, grep("Melanoma", group_list)] # 提出Tumor数据 10825650 
+exprSet=cbind(Normal_expr, Tumor_expr) ## 14488875 elements 
+  ## Normal_expr：矩阵，行为探针ID，列为non_Tumor样本 
+  ## Tumor_expr：矩阵，行为探针ID，筛选出列为Tumor的样本 
+  ## exprSet变成了Normal....Tumor....排序的矩阵，那么后面的group_list也应该相应排序，才能对上信息 
+ 
+dim(exprSet) 
+write.csv(exprSet,"exprSet.csv") 
+save(exprSet,gset,Normal_expr,pdata,Tumor_expr,file='GSE120878_final.Rdata')
+
+
+
+
+
+
+####group_list = c(rep('Normal',ncol(Normal_expr)), ## 1:265 
+               rep('Tumor', ncol(Tumor_expr))) 
+## rep('Normal',ncol(Normal_expr))：连续打和矩阵列数Normal_expr一样数量的non_Tumor 
+## rep('Tumor', ncol(Tumor_expr))：连续打和矩阵列数Tumor_expr一样数量的Tumor 
+save( exprSet, group_list, file = 'exprSet_by_group.Rdata')  
+GPL = b@featureData@data # 先打开b=gset[[1]]的b查看一下，用@提取注释文件 54675 obs. of 21 
+colnames(GPL) # 看一下所有的列名，发现Gene symbol位于第三列，如下图3 
+ids = GPL[,c(1,22,24)] ## 只要探针ID(第一列)和基因名(第三列)，54675 obs of 2 variables(注意数据量变化) 
+ids = ids[ids[,2] != '',] ## 去NA注释(去除没有注释上的探针ID) 45118 obs of 2 variables 
+write.csv(ids,"ids.csv") 
+exprSet <- exprSet[rownames(exprSet) %in% ids[,1],] 
+ids <- ids[match(row.names(exprSet),ids[,1]),] 
+dim(exprSet) 
+dim(ids) 
+rownames(exprSet) <- ids[match(rownames(exprSet),ids[,1]),2] 
